@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LuzMap · Proyector</title>
+<style>
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;cursor:none;font-family:system-ui,sans-serif}
+  #stage{position:fixed;left:0;top:0;width:100vw;height:100vh}
+  #cal{position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none}
+  #info{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);color:#fff;text-align:center;font-size:3.2vw;line-height:1.4;pointer-events:none}
+  #info small{display:block;font-size:1.8vw;opacity:.7}
+  #fs{position:fixed;right:2vw;bottom:2vw;background:#222;color:#fff;border:2px solid #fff;border-radius:1vw;font-size:1.6vw;padding:1vw 2vw;cursor:pointer}
+  #fs:focus{outline:4px solid #ffcc00}
+  #status{position:fixed;left:1vw;bottom:1vw;color:#f55;font-size:1.4vw}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<svg id="cal"></svg>
+<div id="info"></div>
+<button id="fs" autofocus>OK = pantalla completa</button>
+<div id="status"></div>
+<script src="/lib/luzmap.js"></script>
+<script>
+(function () {
+  var stage = document.getElementById('stage');
+  var cal = document.getElementById('cal');
+  var info = document.getElementById('info');
+  var fsBtn = document.getElementById('fs');
+  var status = document.getElementById('status');
+  var r = new LuzMap.Renderer(stage, { mediaBase: '' });
+  var state = null, ips = [];
+  var NS = 'http://www.w3.org/2000/svg';
+
+  fetch('/api/info').then(function (x) { return x.json(); }).then(function (d) {
+    ips = (d.ips || []).map(function (ip) { return 'http://' + ip + ':' + d.port; });
+    draw();
+  }).catch(function () {});
+
+  function el(tag, attrs, parent) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    parent.appendChild(e); return e;
+  }
+
+  function drawCalib(W, H) {
+    cal.innerHTML = '';
+    cal.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    if (!state || !state.calib) return;
+    var s = W / 1280;
+    // grilla tenue de referencia
+    for (var gx = 1; gx < 16; gx++) el('line', { x1: gx * W / 16, y1: 0, x2: gx * W / 16, y2: H, stroke: '#333', 'stroke-width': 1 }, cal);
+    for (var gy = 1; gy < 9; gy++) el('line', { x1: 0, y1: gy * H / 9, x2: W, y2: gy * H / 9, stroke: '#333', 'stroke-width': 1 }, cal);
+    (state.zones || []).forEach(function (z, zi) {
+      var sel = z.id === state.sel;
+      var pts = z.pts.map(function (p) { return [p[0] * W, p[1] * H]; });
+      el('polygon', { points: pts.map(function (p) { return p.join(','); }).join(' '), fill: 'none',
+        stroke: sel ? '#ffcc00' : '#ffffff', 'stroke-width': (sel ? 3 : 1.5) * s, 'stroke-dasharray': sel ? '' : (8 * s) + ' ' + (6 * s) }, cal);
+      var cx = 0, cy = 0; pts.forEach(function (p) { cx += p[0]; cy += p[1]; });
+      var t = el('text', { x: cx / pts.length, y: cy / pts.length, fill: sel ? '#ffcc00' : '#fff', 'font-size': 22 * s,
+        'text-anchor': 'middle', 'dominant-baseline': 'middle', stroke: '#000', 'stroke-width': 4 * s, 'paint-order': 'stroke' }, cal);
+      t.textContent = z.name || ('Zona ' + (zi + 1));
+      pts.forEach(function (p, i) {
+        var active = sel && i === state.selPt;
+        el('circle', { cx: p[0], cy: p[1], r: (active ? 12 : 7) * s, fill: active ? '#ffcc00' : (sel ? '#fff' : '#888'), stroke: '#000', 'stroke-width': 2 * s }, cal);
+        if (active) {
+          el('line', { x1: p[0] - 40 * s, y1: p[1], x2: p[0] + 40 * s, y2: p[1], stroke: '#ffcc00', 'stroke-width': 1.5 * s }, cal);
+          el('line', { x1: p[0], y1: p[1] - 40 * s, x2: p[0], y2: p[1] + 40 * s, stroke: '#ffcc00', 'stroke-width': 1.5 * s }, cal);
+        }
+      });
+    });
+  }
+
+  function draw() {
+    var W = window.innerWidth, H = window.innerHeight;
+    if (state) r.render(state, W, H);
+    drawCalib(W, H);
+    var empty = !state || !state.zones || !state.zones.length;
+    if (state && (state.calib || empty)) {
+      info.style.display = empty ? '' : 'none';
+      info.innerHTML = 'Abrí en el celular:<br><b>' + (ips.length ? ips.join('<br>') : 'http://&lt;IP del proyector&gt;:8080') + '</b>' +
+        '<small>misma red Wi-Fi · ' + W + '×' + H + ' px</small>';
+    } else info.style.display = 'none';
+  }
+
+  LuzMap.connect(function (s) { state = s; status.textContent = ''; draw(); });
+  window.addEventListener('resize', draw);
+
+  // Pantalla completa: hace falta un "clic" real (botón OK del control remoto)
+  function goFull() {
+    var d = document.documentElement;
+    var f = d.requestFullscreen || d.webkitRequestFullscreen;
+    if (f) { try { var p = f.call(d); if (p && p.catch) p.catch(function () {}); } catch (e) {} }
+    // si había videos bloqueados por autoplay, este gesto los destraba
+    var v = document.getElementsByTagName('video');
+    for (var i = 0; i < v.length; i++) { var pp = v[i].play(); if (pp && pp.catch) pp.catch(function () {}); }
+  }
+  fsBtn.addEventListener('click', goFull);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.keyCode === 23) goFull(); });
+  document.addEventListener('fullscreenchange', function () { fsBtn.style.display = document.fullscreenElement ? 'none' : ''; });
+  document.addEventListener('webkitfullscreenchange', function () { fsBtn.style.display = document.webkitFullscreenElement ? 'none' : ''; });
+})();
+</script>
+</body>
+</html>

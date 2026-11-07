@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#111">
+<title>LuzMap · Control</title>
+<style>
+  :root{--bg:#0f0f12;--panel:#1a1a20;--line:#2c2c35;--txt:#eee;--mute:#999;--acc:#ffcc00}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.35 system-ui,-apple-system,sans-serif}
+  header{display:flex;align-items:center;gap:8px;padding:8px 10px;position:sticky;top:0;z-index:5;background:var(--bg)}
+  header h1{font-size:16px;margin:0;flex:1;letter-spacing:.5px}
+  #dot{width:9px;height:9px;border-radius:50%;background:#c33;display:inline-block;margin-right:6px}
+  #dot.ok{background:#3c6}
+  .stickybox{position:sticky;top:44px;z-index:4;background:var(--bg);padding:0 10px 6px}
+  #stageWrap{position:relative;width:100%;padding-top:56.25%;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#000}
+  #stage,#ov{position:absolute;left:0;top:0;width:100%;height:100%}
+  #ov{touch-action:none}
+  main{padding:4px 10px 60px}
+  button,select,input{font:inherit;color:var(--txt)}
+  button{background:#26262e;border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:38px}
+  button:active{background:#33333d}
+  button.on{background:var(--acc);color:#000;border-color:var(--acc)}
+  button.danger{color:#ff7777}
+  select,input[type=text],input[type=number]{background:#111;border:1px solid var(--line);border-radius:8px;padding:7px 8px;width:100%}
+  input[type=color]{width:100%;height:38px;border:1px solid var(--line);border-radius:8px;background:#111;padding:2px}
+  input[type=range]{width:100%}
+  .row{display:flex;gap:6px;align-items:center;margin:6px 0}
+  .row>*{flex:1}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;margin:10px 0}
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--mute);margin:0 0 8px}
+  label{display:block;font-size:12px;color:var(--mute);margin-bottom:3px}
+  .chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+  .chip{white-space:nowrap;flex:none;display:flex;align-items:center;gap:6px}
+  .sw{width:12px;height:12px;border-radius:3px;display:inline-block;border:1px solid #0006}
+  .pad{display:grid;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(3,40px);gap:4px;flex:none}
+  .pad button{padding:0;min-height:0}
+  .mute{color:var(--mute);font-size:12px}
+  .media{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .media .m{position:relative;border:2px solid transparent;border-radius:8px;overflow:hidden;background:#000;padding-top:60%}
+  .media .m.sel{border-color:var(--acc)}
+  .media .m img,.media .m video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover}
+  .media .m span{position:absolute;left:0;right:0;bottom:0;font-size:10px;background:#000a;padding:2px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .media .m .x{position:absolute;right:2px;top:2px;min-height:0;padding:0 6px;font-size:12px;background:#000a;border:0}
+  #prog{height:4px;background:var(--acc);width:0;transition:width .2s}
+  .hide{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <h1><span id="dot"></span>LuzMap</h1>
+  <button id="bCal">Calibrar</button>
+  <button id="bBlack">Apagar</button>
+</header>
+
+<div class="stickybox">
+  <div id="stageWrap"><div id="stage"></div><svg id="ov"></svg></div>
+  <div class="row" style="margin-top:8px">
+    <button id="bAddQ">+ Rectángulo</button>
+    <button id="bAddP">+ Polígono</button>
+    <button id="bFine" title="Arrastre 5× más lento">Fino</button>
+  </div>
+</div>
+
+<main>
+  <div class="card">
+    <h2>Zonas <span class="mute">(arriba = adelante)</span></h2>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div class="card" id="zonePanel">
+    <h2>Zona seleccionada</h2>
+    <div class="row">
+      <input type="text" id="zName" placeholder="Nombre">
+      <button id="zOn" style="flex:none">Visible</button>
+    </div>
+
+    <div class="row" style="align-items:flex-start">
+      <div class="pad">
+        <span></span><button data-n="0,-1">▲</button><span></span>
+        <button data-n="-1,0">◀</button><button id="nMode" style="font-size:11px">pto</button><button data-n="1,0">▶</button>
+        <span></span><button data-n="0,1">▼</button><span></span>
+      </div>
+      <div>
+        <label>Ajuste fino</label>
+        <div class="row"><button id="pPrev">◀ pto</button><button id="pNext">pto ▶</button></div>
+        <div class="row"><select id="nStep"><option value="1">1 px</option><option value="5" selected>5 px</option><option value="20">20 px</option></select></div>
+        <div class="mute" id="ptInfo"></div>
+      </div>
+    </div>
+
+    <label>Efecto</label>
+    <select id="zFx"></select>
+
+    <div class="grid2" style="margin-top:8px">
+      <div id="wC1"><label>Color</label><input type="color" id="zC1"></div>
+      <div id="wC2"><label>Color 2</label><input type="color" id="zC2"></div>
+      <div id="wDur"><label>Duración del ciclo: <b id="vDur"></b></label><input type="range" id="zDur" min="0.2" max="12" step="0.1"></div>
+      <div id="wDelay"><label>Desfase: <b id="vDelay"></b></label><input type="range" id="zDelay" min="0" max="12" step="0.1"></div>
+      <div><label>Intensidad: <b id="vOp"></b></label><input type="range" id="zOp" min="0" max="1" step="0.01"></div>
+      <div id="wDir"><label>Dirección</label>
+        <select id="zDir"><option value="lr">→ izq. a der.</option><option value="rl">← der. a izq.</option><option value="bt">↑ abajo a arriba</option><option value="tb">↓ arriba a abajo</option></select></div>
+      <div id="wWidth"><label>Grosor de línea</label><input type="number" id="zWidth" min="1" max="60"></div>
+      <div id="wGlow"><label>Resplandor</label><button id="zGlow" style="width:100%">No</button></div>
+      <div id="wFit"><label>Encaje</label>
+        <select id="zFit"><option value="cover">Cubrir (recorta)</option><option value="contain">Contener</option><option value="stretch">Estirar</option></select></div>
+      <div id="wRate"><label>Velocidad video</label>
+        <select id="zRate"><option value="0.5">0.5×</option><option value="1">1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></div>
+    </div>
+
+    <div id="wMedia" style="margin-top:8px">
+      <label>Medio (tocá para asignar)</label>
+      <div class="media" id="zMedia"></div>
+    </div>
+
+    <div class="row" style="margin-top:10px">
+      <button id="zUp">Adelante</button><button id="zDown">Atrás</button><button id="zDup">Duplicar</button>
+    </div>
+    <div class="row">
+      <button id="zAddPt">+ punto</button><button id="zDelPt">− punto</button><button id="zDel" class="danger">Eliminar</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Medios</h2>
+    <div class="row"><button id="bUpload">Subir foto o video</button><input type="file" id="file" accept="image/*,video/*" multiple class="hide"></div>
+    <div id="prog"></div>
+    <div class="media" id="lib" style="margin-top:8px"></div>
+    <p class="mute">Videos: MP4 (H.264) a 720p o menos funcionan mejor en el HY300.</p>
+  </div>
+
+  <div class="card">
+    <h2>General</h2>
+    <div class="row"><button id="bSeq">Secuencia: escalonar desfases</button></div>
+    <div class="row"><button id="bSync">Sincronizar todas (desfase 0)</button></div>
+    <div class="row"><button id="bDemo">Cargar demo</button><button id="bExport">Exportar</button><button id="bImport">Importar</button></div>
+    <input type="file" id="impFile" accept="application/json,.json" class="hide">
+    <div class="row"><button id="bPrev">Previa animada</button><button id="bClear" class="danger">Borrar todo</button></div>
+  </div>
+</main>
+
+<script src="/lib/luzmap.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var myId = 'c' + Math.random().toString(36).slice(2, 9);
+  var state = { calib: true, blackout: false, sel: null, selPt: 0, zones: [] };
+  var media = [];
+  var fine = false, nudgeZone = false, preview = true;
+  var PALETTE = ['#ffffff', '#ff3366', '#33ccff', '#ffcc00', '#66ff66', '#cc66ff', '#ff8800'];
+  var NEEDS = {
+    c1: ['solid', 'pulse', 'strobe', 'sweep', 'fill', 'gradient', 'rainbow', 'outline', 'trace'],
+    c2: ['gradient'], dur: ['pulse', 'strobe', 'sweep', 'fill', 'gradient', 'rainbow', 'trace'],
+    delay: ['pulse', 'strobe', 'sweep', 'fill', 'gradient', 'rainbow', 'trace'],
+    dir: ['sweep', 'fill', 'gradient'], width: ['outline', 'trace'], glow: ['outline', 'trace'],
+    fit: ['image', 'video'], rate: ['video'], media: ['image', 'video']
+  };
+
+  // ---------- estado y sincronización ----------
+  var sendTimer = null, pending = false, inflight = false;
+  function push() { pending = true; if (!sendTimer) sendTimer = setTimeout(flush, 40); }
+  function flush() {
+    sendTimer = null;
+    if (inflight) { sendTimer = setTimeout(flush, 40); return; }
+    if (!pending) return;
+    pending = false; inflight = true;
+    var done = function () { inflight = false; };
+    fetch('/api/state?from=' + myId, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state) })
+      .then(done, done);
+  }
+  function selZone() { for (var i = 0; i < state.zones.length; i++) if (state.zones[i].id === state.sel) return state.zones[i]; return null; }
+  function selIndex() { for (var i = 0; i < state.zones.length; i++) if (state.zones[i].id === state.sel) return i; return -1; }
+  function change(rebuildUI) { drawStage(); if (rebuildUI) refreshUI(); push(); }
+
+  var dragging = null;
+  LuzMap.connect(function (s, from) {
+    $('dot').className = 'ok';
+    if (from === myId || dragging) return;
+    state = s; drawStage(); refreshUI();
+  });
+  window.addEventListener('offline', function () { $('dot').className = ''; });
+
+  // ---------- escenario (vista previa + manijas) ----------
+  var stageEl = $('stage'), ov = $('ov');
+  var renderer = new LuzMap.Renderer(stageEl, { mediaBase: '' });
+  var NS = 'http://www.w3.org/2000/svg';
+  function size() { var r = stageEl.getBoundingClientRect(); return { W: r.width, H: r.height, L: r.left, T: r.top }; }
+  function svgEl(tag, a) { var e = document.createElementNS(NS, tag); for (var k in a) e.setAttribute(k, a[k]); ov.appendChild(e); return e; }
+
+  function drawStage() {
+    var s = size();
+    renderer.render(preview ? state : { zones: state.zones.map(function (z) { var c = {}; for (var k in z) c[k] = z[k]; if (c.fx !== 'outline' && c.fx !== 'trace') c.fx = 'solid'; c.opacity = 0.5; return c; }), blackout: state.blackout }, s.W, s.H);
+    ov.innerHTML = '';
+    ov.setAttribute('viewBox', '0 0 ' + s.W + ' ' + s.H);
+    state.zones.forEach(function (z) {
+      var sel = z.id === state.sel;
+      var pts = z.pts.map(function (p) { return [p[0] * s.W, p[1] * s.H]; });
+      svgEl('polygon', { points: pts.map(function (p) { return p.join(','); }).join(' '), fill: sel ? 'rgba(255,204,0,.08)' : 'none',
+        stroke: sel ? '#ffcc00' : 'rgba(255,255,255,.6)', 'stroke-width': sel ? 2 : 1, 'stroke-dasharray': sel ? '' : '4 3' });
+      if (sel) pts.forEach(function (p, i) {
+        var a = i === state.selPt;
+        svgEl('circle', { cx: p[0], cy: p[1], r: a ? 11 : 8, fill: a ? '#ffcc00' : '#fff', stroke: '#000', 'stroke-width': 2 });
+      });
+    });
+  }
+  window.addEventListener('resize', drawStage);
+
+  function inPoly(x, y, pts) {
+    var c = false;
+    for (var i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      var xi = pts[i][0], yi = pts[i][1], xj = pts[j][0], yj = pts[j][1];
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) c = !c;
+    }
+    return c;
+  }
+
+  ov.addEventListener('pointerdown', function (e) {
+    var s = size(), x = e.clientX - s.L, y = e.clientY - s.T;
+    var z = selZone(), hit = null;
+    if (z) { // manijas primero
+      var best = 28 * 28;
+      z.pts.forEach(function (p, i) { var dx = p[0] * s.W - x, dy = p[1] * s.H - y, d = dx * dx + dy * dy; if (d < best) { best = d; hit = i; } });
+    }
+    if (hit !== null) {
+      state.selPt = hit;
+      dragging = { mode: 'pt', zone: z, i: hit, x: x, y: y };
+    } else {
+      var target = null;
+      for (var k = state.zones.length - 1; k >= 0; k--) {
+        var zz = state.zones[k];
+        if (inPoly(x / s.W, y / s.H, zz.pts)) { target = zz; break; }
+      }
+      if (z && inPoly(x / s.W, y / s.H, z.pts)) target = z; // prioridad a la seleccionada
+      if (!target) return;
+      if (target.id !== state.sel) { state.sel = target.id; state.selPt = 0; refreshUI(); }
+      dragging = { mode: 'zone', zone: target, x: x, y: y };
+    }
+    ov.setPointerCapture(e.pointerId);
+    change(false);
+    e.preventDefault();
+  });
+  ov.addEventListener('pointermove', function (e) {
+    if (!dragging) return;
+    var s = size(), x = e.clientX - s.L, y = e.clientY - s.T;
+    var k = fine ? 0.2 : 1;
+    var dx = (x - dragging.x) * k / s.W, dy = (y - dragging.y) * k / s.H;
+    dragging.x = x; dragging.y = y;
+    if (dragging.mode === 'pt') movePt(dragging.zone, dragging.i, dx, dy);
+    else dragging.zone.pts.forEach(function (p, i) { movePt(dragging.zone, i, dx, dy); });
+    change(false);
+  });
+  function endDrag() { if (dragging) { dragging = null; updatePtInfo(); push(); } }
+  ov.addEventListener('pointerup', endDrag);
+  ov.addEventListener('pointercancel', endDrag);
+
+  function clamp(v) { return Math.max(-0.5, Math.min(1.5, v)); }
+  function movePt(z, i, dx, dy) { z.pts[i][0] = clamp(z.pts[i][0] + dx); z.pts[i][1] = clamp(z.pts[i][1] + dy); }
+
+  // ---------- ajuste fino con flechas (mantener apretado repite) ----------
+  function nudge(dx, dy) {
+    var z = selZone(); if (!z) return;
+    var st = +$('nStep').value;
+    dx = dx * st / 1280; dy = dy * st / 720;
+    if (nudgeZone) z.pts.forEach(function (p, i) { movePt(z, i, dx, dy); });
+    else movePt(z, state.selPt, dx, dy);
+    updatePtInfo(); change(false);
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('[data-n]'), function (b) {
+    var v = b.getAttribute('data-n').split(',').map(Number), t1 = null, t2 = null;
+    function stop() { clearTimeout(t1); clearInterval(t2); }
+    b.addEventListener('pointerdown', function (e) { e.preventDefault(); nudge(v[0], v[1]); t1 = setTimeout(function () { t2 = setInterval(function () { nudge(v[0], v[1]); }, 60); }, 350); });
+    b.addEventListener('pointerup', stop); b.addEventListener('pointerleave', stop); b.addEventListener('pointercancel', stop);
+  });
+  $('nMode').onclick = function () { nudgeZone = !nudgeZone; this.textContent = nudgeZone ? 'zona' : 'pto'; this.className = nudgeZone ? 'on' : ''; };
+  $('pPrev').onclick = function () { var z = selZone(); if (!z) return; state.selPt = (state.selPt - 1 + z.pts.length) % z.pts.length; updatePtInfo(); change(false); };
+  $('pNext').onclick = function () { var z = selZone(); if (!z) return; state.selPt = (state.selPt + 1) % z.pts.length; updatePtInfo(); change(false); };
+  function updatePtInfo() {
+    var z = selZone(); if (!z) return;
+    var p = z.pts[state.selPt] || z.pts[0];
+    $('ptInfo').textContent = 'Punto ' + (state.selPt + 1) + '/' + z.pts.length + ' · ' + Math.round(p[0] * 1280) + ', ' + Math.round(p[1] * 720);
+  }
+
+  // ---------- zonas ----------
+  function newId() { return 'z' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
+  function addZone(shape) {
+    var n = state.zones.length, off = (n % 5) * 0.04;
+    var pts = shape === 'poly'
+      ? [[0.5, 0.25], [0.66, 0.42], [0.6, 0.72], [0.4, 0.72], [0.34, 0.42]]
+      : [[0.36, 0.3], [0.64, 0.3], [0.64, 0.7], [0.36, 0.7]];
+    pts = pts.map(function (p) { return [p[0] + off, p[1] + off]; });
+    var z = { id: newId(), name: (shape === 'poly' ? 'Polígono ' : 'Zona ') + (n + 1), shape: shape, pts: pts,
+      fx: 'pulse', c1: PALETTE[n % PALETTE.length], c2: '#0033ff', dur: 3, delay: 0, opacity: 1, dir: 'lr', width: 6, fit: 'cover', rate: 1, on: true };
+    state.zones.push(z); state.sel = z.id; state.selPt = 0;
+    change(true);
+  }
+  $('bAddQ').onclick = function () { addZone('quad'); };
+  $('bAddP').onclick = function () { addZone('poly'); };
+  $('bFine').onclick = function () { fine = !fine; this.className = fine ? 'on' : ''; };
+  $('bCal').onclick = function () { state.calib = !state.calib; change(true); };
+  $('bBlack').onclick = function () { state.blackout = !state.blackout; change(true); };
+
+  function bind(id, key, parse, after) {
+    $(id).addEventListener('input', function () {
+      var z = selZone(); if (!z) return;
+      z[key] = parse ? parse(this.value) : this.value;
+      if (after) after(z);
+      change(false); renderChips(); showValues(z);
+    });
+  }
+  bind('zName', 'name');
+  bind('zC1', 'c1'); bind('zC2', 'c2');
+  bind('zDur', 'dur', Number); bind('zDelay', 'delay', Number); bind('zOp', 'opacity', Number);
+  bind('zDir', 'dir'); bind('zWidth', 'width', Number); bind('zFit', 'fit'); bind('zRate', 'rate', Number);
+  $('zFx').addEventListener('change', function () { var z = selZone(); if (!z) return; z.fx = this.value; change(true); });
+  $('zOn').onclick = function () { var z = selZone(); if (!z) return; z.on = z.on === false; change(true); };
+  $('zGlow').onclick = function () { var z = selZone(); if (!z) return; z.glow = !z.glow; change(true); };
+  $('zDel').onclick = function () {
+    var i = selIndex(); if (i < 0 || !confirm('¿Eliminar esta zona?')) return;
+    state.zones.splice(i, 1);
+    state.sel = state.zones.length ? state.zones[Math.max(0, i - 1)].id : null; state.selPt = 0;
+    change(true);
+  };
+  $('zDup').onclick = function () {
+    var z = selZone(); if (!z) return;
+    var c = JSON.parse(JSON.stringify(z)); c.id = newId(); c.name = (z.name || 'Zona') + ' copia';
+    c.pts = c.pts.map(function (p) { return [p[0] + 0.03, p[1] + 0.03]; });
+    state.zones.splice(selIndex() + 1, 0, c); state.sel = c.id; change(true);
+  };
+  function moveLayer(d) {
+    var i = selIndex(), j = i + d; if (i < 0 || j < 0 || j >= state.zones.length) return;
+    var t = state.zones[i]; state.zones[i] = state.zones[j]; state.zones[j] = t; change(true);
+  }
+  $('zUp').onclick = function () { moveLayer(1); };
+  $('zDown').onclick = function () { moveLayer(-1); };
+  $('zAddPt').onclick = function () {
+    var z = selZone(); if (!z) return;
+    if (z.shape !== 'poly') { if (!confirm('Pasar a polígono libre? (las imágenes dejan de deformarse en perspectiva)')) return; z.shape = 'poly'; }
+    var i = state.selPt, j = (i + 1) % z.pts.length;
+    z.pts.splice(i + 1, 0, [(z.pts[i][0] + z.pts[j][0]) / 2, (z.pts[i][1] + z.pts[j][1]) / 2]);
+    state.selPt = i + 1; change(true);
+  };
+  $('zDelPt').onclick = function () {
+    var z = selZone(); if (!z || z.pts.length <= 3) return;
+    if (z.shape !== 'poly') { z.shape = 'poly'; }
+    z.pts.splice(state.selPt, 1); state.selPt = Math.max(0, state.selPt - 1); change(true);
+  };
+
+  // ---------- paneles ----------
+  function renderChips() {
+    var c = $('chips'); c.innerHTML = '';
+    state.zones.slice().reverse().forEach(function (z) {
+      var b = document.createElement('button');
+      b.className = 'chip' + (z.id === state.sel ? ' on' : '');
+      b.innerHTML = '<i class="sw"></i>';
+      b.firstChild.style.background = z.fx === 'image' || z.fx === 'video' ? '#888' : (z.c1 || '#fff');
+      b.appendChild(document.createTextNode((z.on === false ? '◌ ' : '') + (z.name || 'Zona')));
+      b.onclick = function () { state.sel = z.id; state.selPt = 0; change(true); };
+      c.appendChild(b);
+    });
+    if (!state.zones.length) c.innerHTML = '<span class="mute">Agregá un rectángulo o polígono. Arrastrá las esquinas en el celu mientras mirás la pared.</span>';
+  }
+  function showValues(z) {
+    $('vDur').textContent = (+z.dur || 2).toFixed(1) + ' s';
+    $('vDelay').textContent = (+z.delay || 0).toFixed(1) + ' s';
+    $('vOp').textContent = Math.round((z.opacity == null ? 1 : z.opacity) * 100) + '%';
+  }
+  function renderMediaGrid(el, onPick, selSrc, deletable) {
+    el.innerHTML = '';
+    media.forEach(function (m) {
+      var d = document.createElement('div');
+      d.className = 'm' + (selSrc === m.url ? ' sel' : '');
+      var t = document.createElement(m.kind === 'video' ? 'video' : 'img');
+      t.src = m.url + (m.kind === 'video' ? '#t=0.5' : ''); if (m.kind === 'video') { t.muted = true; t.preload = 'metadata'; }
+      d.appendChild(t);
+      var sp = document.createElement('span'); sp.textContent = (m.kind === 'video' ? '▶ ' : '') + m.name; d.appendChild(sp);
+      if (deletable) {
+        var x = document.createElement('button'); x.className = 'x'; x.textContent = '✕';
+        x.onclick = function (e) { e.stopPropagation(); if (confirm('¿Borrar ' + m.name + '?')) fetch('/api/media?name=' + encodeURIComponent(m.name), { method: 'DELETE' }).then(loadMedia); };
+        d.appendChild(x);
+      }
+      d.onclick = function () { onPick(m); };
+      el.appendChild(d);
+    });
+    if (!media.length) el.innerHTML = '<span class="mute">Todavía no subiste nada.</span>';
+  }
+  function refreshUI() {
+    $('bCal').className = state.calib ? 'on' : '';
+    $('bBlack').className = state.blackout ? 'on' : '';
+    $('bBlack').textContent = state.blackout ? 'Apagado' : 'Apagar';
+    $('bPrev').className = preview ? 'on' : '';
+    renderChips();
+    var z = selZone();
+    $('zonePanel').classList.toggle('hide', !z);
+    if (!z) return;
+    if (state.selPt >= z.pts.length) state.selPt = 0;
+    $('zName').value = z.name || '';
+    $('zOn').className = z.on === false ? '' : 'on';
+    $('zOn').textContent = z.on === false ? 'Oculta' : 'Visible';
+    $('zFx').value = z.fx || 'solid';
+    $('zC1').value = z.c1 || '#ffffff'; $('zC2').value = z.c2 || '#0033ff';
+    $('zDur').value = z.dur || 2; $('zDelay').value = z.delay || 0;
+    $('zOp').value = z.opacity == null ? 1 : z.opacity;
+    $('zDir').value = z.dir || 'lr'; $('zWidth').value = z.width || 6;
+    $('zGlow').textContent = z.glow ? 'Sí' : 'No'; $('zGlow').className = z.glow ? 'on' : '';
+    $('zFit').value = z.fit || 'cover'; $('zRate').value = String(z.rate || 1);
+    var fx = z.fx || 'solid';
+    $('wC1').classList.toggle('hide', NEEDS.c1.indexOf(fx) < 0);
+    $('wC2').classList.toggle('hide', NEEDS.c2.indexOf(fx) < 0);
+    $('wDur').classList.toggle('hide', NEEDS.dur.indexOf(fx) < 0);
+    $('wDelay').classList.toggle('hide', NEEDS.delay.indexOf(fx) < 0);
+    $('wDir').classList.toggle('hide', NEEDS.dir.indexOf(fx) < 0);
+    $('wWidth').classList.toggle('hide', NEEDS.width.indexOf(fx) < 0);
+    $('wGlow').classList.toggle('hide', NEEDS.glow.indexOf(fx) < 0);
+    $('wFit').classList.toggle('hide', NEEDS.fit.indexOf(fx) < 0);
+    $('wRate').classList.toggle('hide', NEEDS.rate.indexOf(fx) < 0);
+    $('wMedia').classList.toggle('hide', NEEDS.media.indexOf(fx) < 0);
+    $('zDelPt').disabled = z.pts.length <= 3;
+    showValues(z); updatePtInfo();
+    renderMediaGrid($('zMedia'), function (m) {
+      var zz = selZone(); if (!zz) return; zz.src = m.url; zz.fx = m.kind; change(true);
+    }, z.src, false);
+  }
+
+  LuzMap.EFFECTS.forEach(function (e) { var o = document.createElement('option'); o.value = e[0]; o.textContent = e[1]; $('zFx').appendChild(o); });
+
+  // ---------- medios ----------
+  function loadMedia() {
+    return fetch('/api/media').then(function (r) { return r.json(); }).then(function (l) {
+      media = l; renderMediaGrid($('lib'), function (m) {
+        var z = selZone(); if (!z) return; z.src = m.url; z.fx = m.kind; change(true);
+      }, null, true); refreshUI();
+    });
+  }
+  $('bUpload').onclick = function () { $('file').click(); };
+  $('file').onchange = function () {
+    var files = Array.prototype.slice.call(this.files); this.value = '';
+    (function next() {
+      var f = files.shift(); if (!f) { $('prog').style.width = '0'; return loadMedia(); }
+      var x = new XMLHttpRequest();
+      x.open('POST', '/api/upload?name=' + encodeURIComponent(f.name));
+      x.upload.onprogress = function (e) { if (e.lengthComputable) $('prog').style.width = (e.loaded / e.total * 100) + '%'; };
+      x.onload = function () {
+        try { var r = JSON.parse(x.responseText); var z = selZone();
+          if (z && r.url && files.length === 0) { z.src = r.url; z.fx = /^video/.test(f.type) ? 'video' : 'image'; change(true); } } catch (e) {}
+        next();
+      };
+      x.onerror = function () { alert('Falló la subida de ' + f.name); next(); };
+      x.send(f);
+    })();
+  };
+
+  // ---------- general ----------
+  $('bSeq').onclick = function () {
+    var anim = state.zones.filter(function (z) { return NEEDS.delay.indexOf(z.fx) >= 0; });
+    if (!anim.length) return alert('Ninguna zona tiene un efecto animado.');
+    var d = +((selZone() || anim[0]).dur) || 2;
+    anim.forEach(function (z, i) { z.dur = d; z.delay = +(i * d / anim.length).toFixed(2); });
+    change(true);
+  };
+  $('bSync').onclick = function () { state.zones.forEach(function (z) { z.delay = 0; }); change(true); };
+  $('bPrev').onclick = function () { preview = !preview; drawStage(); refreshUI(); };
+  $('bClear').onclick = function () { if (confirm('¿Borrar todas las zonas?')) { state.zones = []; state.sel = null; change(true); } };
+  $('bExport').onclick = function () {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(state, null, 1)], { type: 'application/json' }));
+    a.download = 'luzmap-escena.json'; a.click();
+  };
+  $('bImport').onclick = function () { $('impFile').click(); };
+  $('impFile').onchange = function () {
+    var f = this.files[0]; this.value = ''; if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function () { try { var s = JSON.parse(rd.result); if (!s.zones) throw 0; state = s; change(true); } catch (e) { alert('Archivo inválido'); } };
+    rd.readAsText(f);
+  };
+  $('bDemo').onclick = function () {
+    if (state.zones.length && !confirm('Reemplazar las zonas actuales por la demo?')) return;
+    var mk = function (name, pts, o) { var z = { id: newId(), name: name, shape: pts.length === 4 ? 'quad' : 'poly', pts: pts, c1: '#ffffff', c2: '#0033ff', dur: 3, delay: 0, opacity: 1, dir: 'lr', width: 6, fit: 'cover', rate: 1, on: true }; for (var k in o) z[k] = o[k]; return z; };
+    state.zones = [
+      mk('Cuadro 1', [[0.08, 0.15], [0.3, 0.12], [0.31, 0.5], [0.09, 0.52]], { fx: 'sweep', c1: '#33ccff', dur: 2.5 }),
+      mk('Cuadro 2', [[0.39, 0.12], [0.61, 0.12], [0.61, 0.5], [0.39, 0.5]], { fx: 'sweep', c1: '#33ccff', dur: 2.5, delay: 0.8 }),
+      mk('Cuadro 3', [[0.7, 0.12], [0.92, 0.15], [0.91, 0.52], [0.69, 0.5]], { fx: 'sweep', c1: '#33ccff', dur: 2.5, delay: 1.6 }),
+      mk('Repisa', [[0.1, 0.7], [0.9, 0.7], [0.9, 0.76], [0.1, 0.76]], { fx: 'fill', c1: '#ff3366', dur: 4 }),
+      mk('Estrella', [[0.5, 0.56], [0.53, 0.64], [0.61, 0.64], [0.55, 0.69], [0.57, 0.77], [0.5, 0.72], [0.43, 0.77], [0.45, 0.69], [0.39, 0.64], [0.47, 0.64]], { fx: 'trace', c1: '#ffcc00', dur: 3, width: 5, glow: true })
+    ];
+    state.sel = state.zones[0].id; state.selPt = 0; change(true);
+  };
+
+  fetch('/api/state').then(function (r) { return r.json(); }).then(function (s) { state = s; drawStage(); refreshUI(); loadMedia(); });
+})();
+</script>
+</body>
+</html>
